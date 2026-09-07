@@ -1,0 +1,329 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ENUMS
+
+enum Role {
+  STANDARD
+  MODERATOR
+  ADMIN
+}
+
+enum Sender {
+  USER
+  ASSISTANT
+}
+
+enum RiskLevel {
+  NONE
+  LOW
+  MODERATE
+  HIGH
+  CRITICAL
+}
+
+enum Mood {
+  TRES_BIEN
+  BIEN
+  NORMAL
+  TRISTE
+  ANXIEUX
+  TRES_MAL
+}
+
+enum Visibility {
+  PRIVE
+  ANONYME
+  PUBLIC
+}
+
+enum ReactionType {
+  SOUTIEN
+  COEUR
+  FORCE
+  MERCI
+}
+
+enum ReportReason {
+  HARCELEMENT
+  INSULTES
+  CONTENU_DANGEREUX
+  MENACE
+  CONTENU_INAPPROPRIE
+  DISCRIMINATION
+  SPAM
+  AUTRE
+}
+
+enum ReportStatus {
+  OUVERT
+  EN_COURS
+  RESOLU
+  REJETE
+}
+
+
+// USERS
+
+model User {
+  id           String    @id @default(uuid())
+  username     String    @unique @db.VarChar(50)
+  email        String?   @unique
+  passwordHash String    @map("password_hash")
+  avatarUrl    String?   @map("avatar_url")
+  role         Role      @default(STANDARD)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  deletedAt    DateTime? @map("deleted_at")
+
+  privacySettings PrivacySettings?
+  conversations   Conversation[]
+  journalEntries  JournalEntry[]
+  posts           Post[]
+  reactions       Reaction[]
+  reportsFiled    Report[]         @relation("ReportsFiled")
+  notifications   Notification[]
+  favoriteTracks  UserFavoriteTrack[]
+  groupMemberships GroupMember[]
+  groupMessages   GroupMessage[]
+  riskAlerts      RiskAlert[]
+
+  blockedBy UserBlock[] @relation("BlockedBy")
+  blocking  UserBlock[] @relation("Blocking")
+
+  @@map("users")
+}
+
+model UserBlock {
+  userId        String   @map("user_id")
+  blockedUserId String   @map("blocked_user_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  user        User @relation("Blocking", fields: [userId], references: [id], onDelete: Cascade)
+  blockedUser User @relation("BlockedBy", fields: [blockedUserId], references: [id], onDelete: Cascade)
+
+  @@id([userId, blockedUserId])
+  @@map("user_blocks")
+}
+
+model PrivacySettings {
+  id                     String     @id @default(uuid())
+  userId                 String     @unique @map("user_id")
+  historyEnabled         Boolean    @default(true) @map("history_enabled")
+  notificationsEnabled   Boolean    @default(true) @map("notifications_enabled")
+  defaultVisibility      Visibility @default(ANONYME) @map("default_visibility")
+  biometricAuthEnabled   Boolean    @default(false) @map("biometric_auth_enabled")
+  autoLogoutMinutes      Int        @default(15) @map("auto_logout_minutes")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("privacy_settings")
+}
+
+
+// CONVERSATIONS & MESSAGES
+
+model Conversation {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  isLocked  Boolean  @default(false) @map("is_locked")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@index([userId])
+  @@map("conversations")
+}
+
+model Message {
+  id                String    @id @default(uuid())
+  conversationId    String    @map("conversation_id")
+  sender            Sender
+  encryptedContent  String    @map("encrypted_content")
+  riskLevel         RiskLevel @default(NONE) @map("risk_level")
+  sentAt            DateTime  @default(now()) @map("sent_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  riskAlert    RiskAlert?
+
+  @@index([conversationId])
+  @@map("messages")
+}
+
+
+// DÉTECTION DE RISQUE
+
+model RiskAlert {
+  id                 String    @id @default(uuid())
+  messageId          String    @unique @map("message_id")
+  userId             String    @map("user_id")
+  level              RiskLevel
+  detectedAt         DateTime  @default(now()) @map("detected_at")
+  escalated          Boolean   @default(false)
+  escalatedTo        String?   @map("escalated_to")
+  recommendedAction  String?   @map("recommended_action")
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("risk_alerts")
+}
+
+
+// JOURNAL
+
+model JournalEntry {
+  id               String   @id @default(uuid())
+  userId           String   @map("user_id")
+  encryptedContent String   @map("encrypted_content")
+  mood             Mood
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("journal_entries")
+}
+
+
+// COMMUNAUTÉ
+
+model Post {
+  id         String     @id @default(uuid())
+  authorId   String     @map("author_id")
+  content    String
+  visibility Visibility @default(ANONYME)
+  createdAt  DateTime   @default(now()) @map("created_at")
+  isHidden   Boolean    @default(false) @map("is_hidden")
+
+  author    User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  reactions Reaction[]
+  reports   Report[]
+
+  @@index([authorId])
+  @@map("posts")
+}
+
+model Reaction {
+  id        String       @id @default(uuid())
+  postId    String       @map("post_id")
+  userId    String       @map("user_id")
+  type      ReactionType
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId, type])
+  @@map("reactions")
+}
+
+model Report {
+  id          String       @id @default(uuid())
+  postId      String       @map("post_id")
+  reporterId  String       @map("reporter_id")
+  reason      ReportReason
+  description String?
+  status      ReportStatus @default(OUVERT)
+  resolvedBy  String?      @map("resolved_by")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  resolvedAt  DateTime?    @map("resolved_at")
+
+  post     Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  reporter User @relation("ReportsFiled", fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@map("reports")
+}
+
+
+// GROUPES 
+
+model GroupDiscussion {
+  id                    String   @id @default(uuid())
+  name                  String   @db.VarChar(100)
+  theme                 String?  @db.VarChar(100)
+  isAnonymousByDefault  Boolean  @default(true) @map("is_anonymous_by_default")
+  createdAt             DateTime @default(now()) @map("created_at")
+
+  members  GroupMember[]
+  messages GroupMessage[]
+
+  @@map("group_discussions")
+}
+
+model GroupMessage {
+  id          String   @id @default(uuid())
+  groupId     String   @map("group_id")
+  userId      String   @map("user_id")
+  content     String
+  isAnonymous Boolean  @default(true) @map("is_anonymous")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  group GroupDiscussion @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([groupId])
+  @@map("group_messages")
+}
+
+model GroupMember {
+  groupId  String   @map("group_id")
+  userId   String   @map("user_id")
+  joinedAt DateTime @default(now()) @map("joined_at")
+
+  group GroupDiscussion @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, userId])
+  @@map("group_members")
+}
+
+
+// MUSIQUE
+
+model MusicTrack {
+  id              String @id @default(uuid())
+  title           String @db.VarChar(150)
+  ambiance        String @db.VarChar(50)
+  url             String
+  durationSeconds Int    @map("duration_seconds")
+
+  favoritedBy UserFavoriteTrack[]
+
+  @@map("music_tracks")
+}
+
+model UserFavoriteTrack {
+  userId  String   @map("user_id")
+  trackId String   @map("track_id")
+  addedAt DateTime @default(now()) @map("added_at")
+
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track MusicTrack @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@id([userId, trackId])
+  @@map("user_favorite_tracks")
+}
+
+
+// NOTIFICATIONS
+
+model Notification {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  content     String
+  scheduledAt DateTime @map("scheduled_at")
+  sent        Boolean  @default(false)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
