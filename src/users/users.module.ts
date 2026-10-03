@@ -5,10 +5,7 @@ import { PassportModule } from '@nestjs/passport';
 
 
 @Module({
-  imports: [PassportModule.register({
-    defaultStrategy: 'jwt',
-  }),
-  ],
+  imports: [],
   controllers: [UsersController],
   providers: [UsersService],
   exports: [UsersService],

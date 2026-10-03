@@ -9,7 +9,7 @@ enum VisibilityDto {
 export class UpdatePrivacyDto {
     @IsOptional()
     @IsBoolean()
-    hstoryEnabled?: boolean;
+    historyEnabled?: boolean;
 
     @IsOptional()
     @IsBoolean()

@@ -32,7 +32,7 @@ export class UsersService {
 
     async getProfile(userId: string) {
         const user = await this.prisma.user.findUnique({
-            where: { id:userId },
+            where: { id: userId },
             select: {
                 id: true,
                 username: true,
@@ -70,28 +70,28 @@ export class UsersService {
                 privacySettings: true,
                 journalEntries: true,
                 posts: true,
-                conversations: { include: { messages: true }},
+                conversations: { include: { messages: true } },
             },
         });
 
     }
 
-       async deleteAccount(userId: string) {
-            await this.prisma.$transaction([
-                this.prisma.user.update({
-                    where: { id: userId },
-                    data: { deletedAt: new Date(), email: null, passwordHash: 'deleted'},
+    async deleteAccount(userId: string) {
+        await this.prisma.$transaction([
+            this.prisma.user.update({
+                where: { id: userId },
+                data: { deletedAt: new Date(), email: null, passwordHash: 'deleted' },
 
-                }),
-                this.prisma.journalEntry.deleteMany({ where: {userId }}),
-                this.prisma.conversation.deleteMany({ where: { userId }}),
-            ]);
-            return { success: true };
-        }
+            }),
+            this.prisma.journalEntry.deleteMany({ where: { userId } }),
+            this.prisma.conversation.deleteMany({ where: { userId } }),
+        ]);
+        return { success: true };
+    }
 
-        async blockUser(userId: string, blockedUserId: string) {
-            return this.prisma.userBlock.create({ data: { userId, blockedUserId }});
-        }
+    async blockUser(userId: string, blockedUserId: string) {
+        return this.prisma.userBlock.create({ data: { userId, blockedUserId } });
+    }
 }
 
 

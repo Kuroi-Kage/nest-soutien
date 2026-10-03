@@ -4,7 +4,7 @@ import { UsersService } from "./users.service.js";
 import { CurrentUser } from "../common/decorators/current-user.decorator.js";
 import { UpdatePrivacyDto } from "./dto/update-privacy.dto.js";
 
-@UseGuards(JwtAuthGuard)
+
 @Controller('users/me')
 export class UsersController {
     constructor(private readonly usersService: UsersService) {}
